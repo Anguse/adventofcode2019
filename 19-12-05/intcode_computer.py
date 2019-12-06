@@ -81,7 +81,6 @@ def intcode_program(intcodes):
             break
     return intcodes
 
-
 if __name__ == '__main__':
     intcodes_input = open('codes.txt', 'r').read()
     intcodes = intcodes_input.split(',')
