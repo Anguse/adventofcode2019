@@ -16,8 +16,6 @@ thrust = 0
 def set_output(amplifier, value):
 
     global amp1_buffer, amp2_buffer, amp3_buffer, amp4_buffer, amp5_buffer, mutex
-
-    print("amp %s outputs %d"%(amplifier, value))
     mutex.acquire()
     if amplifier == 'a':
         amp2_buffer.append(value)
@@ -34,7 +32,6 @@ def set_output(amplifier, value):
 def get_input(amplifier, arg_ptr):
 
     global amp1_buffer, amp2_buffer, amp3_buffer, amp4_buffer, amp5_buffer, mutex
-
     done = False
     while not done:
         mutex.acquire()
@@ -153,7 +150,6 @@ def run_amplifier_setup(intcodes, phase_settings):
 
     global amp1_buffer, amp2_buffer, amp3_buffer, amp4_buffer, amp5_buffer, mutex
     amps = ['a', 'b', 'c', 'd', 'e']
-
     mutex.acquire()
     amp1_buffer = [0]
     amp2_buffer = []
