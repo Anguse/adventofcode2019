@@ -1,6 +1,7 @@
 import string
-import threading
 import time
+from copy import deepcopy
+from threading import Thread, Lock
 from itertools import permutations
 
 amp1_buffer = []
@@ -8,10 +9,14 @@ amp2_buffer = []
 amp3_buffer = []
 amp4_buffer = []
 amp5_buffer = []
+
+mutex = Lock()
+
 thrusts = []
 
 def set_output(amplifier, value):
     print("amp %s outputs %d"%(amplifier, value))
+    mutex.acquire()
     if amplifier == 'a':
         amp2_buffer.append(value)
     elif amplifier == 'b':
@@ -22,29 +27,28 @@ def set_output(amplifier, value):
         amp5_buffer.append(value)
     elif amplifier == 'e':
         amp1_buffer.append(value)
+    mutex.release()
 
 def get_input(amplifier, arg_ptr):
     done = False
-    count = 0
     while not done:
-        # To avoid program getting stuck
-        if count > 10:
-            exit()
+        mutex.acquire()
         try:
             if amplifier == 'a':
-                return amp1_buffer[arg_ptr]
+                value = amp1_buffer[arg_ptr]
             elif amplifier == 'b':
-                return amp2_buffer[arg_ptr]
+                value = amp2_buffer[arg_ptr]
             elif amplifier == 'c':
-                return amp3_buffer[arg_ptr]
+                value = amp3_buffer[arg_ptr]
             elif amplifier == 'd':
-                return amp4_buffer[arg_ptr]
+                value = amp4_buffer[arg_ptr]
             elif amplifier == 'e':
-                return amp5_buffer[arg_ptr]
+                value = amp5_buffer[arg_ptr]
+            mutex.release()
+            return value
         except IndexError:
             # wait for other amplifiers
-            time.sleep(.001)
-            count += 1
+            mutex.release()
             continue
         break
 
@@ -145,18 +149,20 @@ if __name__ == '__main__':
     
     sequences = permutations([5,6,7,8,9])
     amps = ['a', 'b', 'c', 'd', 'e']
-    threads = []
+    amp_threads = []
     for seq in list(sequences):
+        mutex.acquire()
         amp1_buffer = [0]
         amp2_buffer = []
         amp3_buffer = []
         amp4_buffer = []
         amp5_buffer = []
+        mutex.release()
         for i,amp in enumerate(amps):
-            t = threading.Thread(target=intcode_program, args=(intcodes, amp, seq[i]))
+            t = Thread(target=intcode_program, args=(deepcopy(intcodes), amp, seq[i]))
             t.start()
-            threads.append(t)
-        for t in threads:
+            amp_threads.append(t)
+        for t in amp_threads:
             t.join()
     print("max thrust %d"%max(thrusts))
     
