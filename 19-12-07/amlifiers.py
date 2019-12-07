@@ -1,5 +1,52 @@
 import string
+import threading
+import time
 from itertools import permutations
+
+amp1_buffer = []
+amp2_buffer = []
+amp3_buffer = []
+amp4_buffer = []
+amp5_buffer = []
+thrusts = []
+
+def set_output(amplifier, value):
+    print("amp %s outputs %d"%(amplifier, value))
+    if amplifier == 'a':
+        amp2_buffer.append(value)
+    elif amplifier == 'b':
+        amp3_buffer.append(value)
+    elif amplifier == 'c':
+        amp4_buffer.append(value)
+    elif amplifier == 'd':
+        amp5_buffer.append(value)
+    elif amplifier == 'e':
+        amp1_buffer.append(value)
+
+def get_input(amplifier, arg_ptr):
+    done = False
+    count = 0
+    while not done:
+        # To avoid program getting stuck
+        if count > 10:
+            exit()
+        try:
+            if amplifier == 'a':
+                return amp1_buffer[arg_ptr]
+            elif amplifier == 'b':
+                return amp2_buffer[arg_ptr]
+            elif amplifier == 'c':
+                return amp3_buffer[arg_ptr]
+            elif amplifier == 'd':
+                return amp4_buffer[arg_ptr]
+            elif amplifier == 'e':
+                return amp5_buffer[arg_ptr]
+        except IndexError:
+            # wait for other amplifiers
+            time.sleep(.001)
+            count += 1
+            continue
+        break
 
 def get_params(param_modes, intcodes, i_ptr):
     if param_modes[0] == 0:
@@ -13,10 +60,11 @@ def get_params(param_modes, intcodes, i_ptr):
     param3 = intcodes[i_ptr+3]
     return [param1, param2, param3]
 
-def intcode_program(intcodes, args):
+def intcode_program(intcodes, amplifier, phase_setting):
     finished = False
-    arg_ptr = 0
+    arg_ptr = -1
     i_ptr = 0
+    output = 0
     while not finished:
         params_opcode = str(intcodes[i_ptr])
         while len(params_opcode) < 5:
@@ -40,13 +88,16 @@ def intcode_program(intcodes, args):
         elif opcode == 3:
             # input
             params = intcodes[i_ptr+1]
-            intcodes[params] = args[arg_ptr]
+            if arg_ptr == -1:
+                intcodes[params] = phase_setting
+            else:
+                intcodes[params] = get_input(amplifier, arg_ptr)
             arg_ptr += 1
             i_ptr += 2
         elif opcode == 4:
             # output
             params = intcodes[i_ptr+1]
-            #print(intcodes[params])
+            set_output(amplifier, intcodes[params])
             output = intcodes[params]
             i_ptr += 2
         elif opcode == 5:
@@ -81,32 +132,31 @@ def intcode_program(intcodes, args):
             i_ptr += 4
         elif opcode == 99:
             # halt
+            thrusts.append(output)
             finished = True
             break
-    return output
+    return
+
 
 if __name__ == '__main__':
     intcodes_input = open('input.txt', 'r').read()
     intcodes = intcodes_input.split(',')
     intcodes = list(map(int, intcodes))
-    max_current = 0
-
-    sequences = permutations([0,1,2,3,4])
+    
+    sequences = permutations([5,6,7,8,9])
+    amps = ['a', 'b', 'c', 'd', 'e']
+    threads = []
     for seq in list(sequences):
-            amp1 = intcode_program(intcodes, [seq[0],0])
-            amp2 = intcode_program(intcodes, [seq[1],amp1])
-            amp3 = intcode_program(intcodes, [seq[2],amp2])
-            amp4 = intcode_program(intcodes, [seq[3],amp3])
-            amp5 = intcode_program(intcodes, [seq[4],amp4])
-            if amp5 > max_current:
-                max_current = amp5
-    print(max_current)
-    '''
-    for i in range(4):
-        for ii in range(4):
-            for iii in range(4):
-                for iiii in range(4):
-                    for iiiii in range(4):
-                        
-    print(max_current)
-    '''
+        amp1_buffer = [0]
+        amp2_buffer = []
+        amp3_buffer = []
+        amp4_buffer = []
+        amp5_buffer = []
+        for i,amp in enumerate(amps):
+            t = threading.Thread(target=intcode_program, args=(intcodes, amp, seq[i]))
+            t.start()
+            threads.append(t)
+        for t in threads:
+            t.join()
+    print("max thrust %d"%max(thrusts))
+    
