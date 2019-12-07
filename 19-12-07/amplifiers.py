@@ -1,5 +1,4 @@
-import string
-import time
+from string import split
 from copy import deepcopy
 from threading import Thread, Lock
 from itertools import permutations
@@ -12,9 +11,12 @@ amp5_buffer = []
 
 mutex = Lock()
 
-thrusts = []
+thrust = 0
 
 def set_output(amplifier, value):
+
+    global amp1_buffer, amp2_buffer, amp3_buffer, amp4_buffer, amp5_buffer, mutex
+
     print("amp %s outputs %d"%(amplifier, value))
     mutex.acquire()
     if amplifier == 'a':
@@ -30,6 +32,9 @@ def set_output(amplifier, value):
     mutex.release()
 
 def get_input(amplifier, arg_ptr):
+
+    global amp1_buffer, amp2_buffer, amp3_buffer, amp4_buffer, amp5_buffer, mutex
+
     done = False
     while not done:
         mutex.acquire()
@@ -53,6 +58,7 @@ def get_input(amplifier, arg_ptr):
         break
 
 def get_params(param_modes, intcodes, i_ptr):
+
     if param_modes[0] == 0:
         param1 = intcodes[intcodes[i_ptr+1]]
     else:
@@ -65,6 +71,8 @@ def get_params(param_modes, intcodes, i_ptr):
     return [param1, param2, param3]
 
 def intcode_program(intcodes, amplifier, phase_setting):
+
+    global thrust, mutex
     finished = False
     arg_ptr = -1
     i_ptr = 0
@@ -136,33 +144,44 @@ def intcode_program(intcodes, amplifier, phase_setting):
             i_ptr += 4
         elif opcode == 99:
             # halt
-            thrusts.append(output)
+            thrust = output
             finished = True
             break
     return
 
+def run_amplifier_setup(intcodes, phase_settings):
 
+    global amp1_buffer, amp2_buffer, amp3_buffer, amp4_buffer, amp5_buffer, mutex
+    amps = ['a', 'b', 'c', 'd', 'e']
+
+    mutex.acquire()
+    amp1_buffer = [0]
+    amp2_buffer = []
+    amp3_buffer = []
+    amp4_buffer = []
+    amp5_buffer = []
+    mutex.release()
+
+    for i,amp in enumerate(amps):
+        t = Thread(target=intcode_program, args=(deepcopy(intcodes), amp, phase_settings[i]))
+        t.start()
+        amp_threads.append(t)
+    for t in amp_threads:
+        t.join()
+    return
+    
 if __name__ == '__main__':
+
     intcodes_input = open('input.txt', 'r').read()
     intcodes = intcodes_input.split(',')
     intcodes = list(map(int, intcodes))
     
     sequences = permutations([5,6,7,8,9])
-    amps = ['a', 'b', 'c', 'd', 'e']
     amp_threads = []
-    for seq in list(sequences):
-        mutex.acquire()
-        amp1_buffer = [0]
-        amp2_buffer = []
-        amp3_buffer = []
-        amp4_buffer = []
-        amp5_buffer = []
-        mutex.release()
-        for i,amp in enumerate(amps):
-            t = Thread(target=intcode_program, args=(deepcopy(intcodes), amp, seq[i]))
-            t.start()
-            amp_threads.append(t)
-        for t in amp_threads:
-            t.join()
-    print("max thrust %d"%max(thrusts))
-    
+    max_thrust = 0
+
+    for phase_settings in list(sequences):
+        run_amplifier_setup(intcodes, phase_settings)
+        if thrust > max_thrust:
+            max_thrust = thrust
+    print(max_thrust)
